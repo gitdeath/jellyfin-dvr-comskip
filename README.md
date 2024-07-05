@@ -13,3 +13,6 @@ If you have updates for this script please submit a PR so everyone can benefit.
 
 You will need to have Comskip already installed from here:
 https://github.com/erikkaashoek/Comskip
+
+CREDIT TO Protektor-Desura/jellyfin-dvr-comskip 
+- I forked to fix a bug that wasn't merged.
