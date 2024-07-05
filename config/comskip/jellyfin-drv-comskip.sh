@@ -18,6 +18,7 @@ __ffmpeg="$(which ffmpeg || echo '/usr/lib/jellyfin-ffmpeg/ffmpeg')"
 
 # Set to skip commercials (mark as chapters) or cut commercials
 __command="/config/comcut"
+__command="/config/comchap"
 
 # Set video codec for ffmpeg
 __videocodec="libvpx-vp9"
@@ -38,7 +39,7 @@ __crf="20"
 __preset="slow"
 
 # Define base output directory
-__base_output_dir="/media"
+__base_output_dir="/media/livetv"
 
 # -------------------------
 
