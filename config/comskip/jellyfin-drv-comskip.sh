@@ -34,8 +34,10 @@ process_video() {
     local output_file="${output_directory}/${original_filename%.*}.mkv"
 
     # Ensure the output directory exists
-    mkdir -p "$output_directory"
-
+    if ! mkdir -p "$output_directory"; then
+        echo "Failed to create output directory: $output_directory"
+        exit 1  # Exit the script with a non-zero status indicating failure
+    fi
     # Check for lock file and retry logic
     attempt=0
     while [[ -f "$lockfile" && $attempt -lt 15 ]]; do
