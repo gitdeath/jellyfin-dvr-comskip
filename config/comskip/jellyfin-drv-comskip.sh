@@ -2,7 +2,12 @@
 
 # Define paths and variables
 comchap="/config/comskip/comchap"
+comskip="/opt/Comskip/comskip"
+lockfile="/tmp/comchap.lock"
+comskip_ini="/config/comskip/comskip.ini"
+ffmpeg="/usr/local/bin/ffmpeg"
 output_root="/media/livetv"
+
 
 # Function to extract output directory from .nfo file
 get_output_directory() {
@@ -22,8 +27,21 @@ process_video() {
     # Ensure the output directory exists
     mkdir -p "$output_directory"
 
+    # Check for lock file and retry logic
+    attempt=0
+    while [[ -f "$lockfile" && $attempt -lt 15 ]]; do
+        echo "Waiting for comchap to finish processing. Attempt: $((attempt + 1)) of 10..."
+        sleep 600  # 10 minutes
+        ((attempt++))
+    done
+
+    if [[ -f "$lockfile" ]]; then
+        echo "Error: comchap is still running after 10 attempts. Exiting."
+        exit 1
+    fi
+
     # Run comchap with specified parameters
-    "$comchap" --comskip="/opt/Comskip/comskip" --lockfile="/tmp/comchap.lock" --comskip-ini="/config/comskip/comskip.ini" --ffmpeg="/usr/local/bin/ffmpeg" "$video_file" "$output_file"
+    "$comchap" --comskip="$comskip" --lockfile="$lockfile" --comskip-ini="$comskip_ini" --ffmpeg="$ffmpeg" "$video_file" "$output_file"
 
     # Check if comchap failed to generate output file
     if [[ ! -f "$output_file" ]]; then
