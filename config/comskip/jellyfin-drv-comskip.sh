@@ -97,19 +97,21 @@ mkdir -p "${__output_dir}"
 cd "${__dir}"
 
 # Extract closed captions to external SRT file
-printf "[post-process.sh] %bExtracting subtitles...%b\n" "$GREEN" "$NC"
-"$__ffmpeg" -f lavfi -i "movie=${__file}[out+subcc]" -map 0:1 "${__base}.en.srt"
+#printf "[post-process.sh] %bExtracting subtitles...%b\n" "$GREEN" "$NC"
+#"$__ffmpeg" -f lavfi -i "movie=${__file}[out+subcc]" -map 0:1 "${__base}.en.srt"
 
 # comcut/comskip - currently using jellyfin ffmpeg in docker
 "$__command" --ffmpeg="$__ffmpeg" --comskip="/opt/Comskip/comskip" --lockfile="/tmp/comchap.lock" --comskip-ini="/config/comskip/comskip.ini" "${__file}"
 
 # Transcode to mkv, crf parameter can be adjusted to change output quality
 printf "[post-process.sh] %bTranscoding file...%b\n" "$GREEN" "$NC"
-"$__ffmpeg" -i "${__file}" -acodec "${__audiocodec}" -b:a "${__bitrate}" -vcodec "${__videocodec}" -vf yadif=parity=auto -crf "${__crf}" -preset "${__preset}" "${__output_dir}/${__base}.${__container}"
+"$__ffmpeg" -i "${__file}" -i "${__file}" -map 0 -map 1:s -acodec "${__audiocodec}" -b:a "${__bitrate}" -vcodec "${__videocodec}" -vf yadif=parity=auto -crf "${__crf}" -preset "${__preset}" -metadata:s:s:0 language=eng "${__output_dir}/${__base}.${__container}"
 
 # Remove the original recording file
-printf "[post-process.sh] %bRemoving original file...%b\n" "$GREEN" "$NC"
+printf "[post-process.sh] %bRemoving original files...%b\n" "$GREEN" "$NC"
 rm "${__file}"
+rm "${__nfo_file}"
+rm -r "${__dir}"
 
 # Return to the starting directory
 cd "${PWD}"
