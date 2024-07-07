@@ -7,7 +7,16 @@ lockfile="/tmp/comchap.lock"
 comskip_ini="/config/comskip/comskip.ini"
 ffmpeg="/usr/local/bin/ffmpeg"
 output_root="/media/livetv"
+log_dir="/config/log"
+verbose=1
 
+# Function to set up logging
+setup_logging() {
+    if [[ $verbose -eq 1 ]]; then
+        log_file="$log_dir/$(date '+%Y_%m_%d')_post_processing.log"
+        exec > >(tee -a "$log_file") 2>&1
+    fi
+}
 
 # Function to extract output directory from .nfo file
 get_output_directory() {
@@ -30,18 +39,25 @@ process_video() {
     # Check for lock file and retry logic
     attempt=0
     while [[ -f "$lockfile" && $attempt -lt 15 ]]; do
-        echo "Waiting for comchap to finish processing. Attempt: $((attempt + 1)) of 10..."
+        echo "Waiting for comchap to finish processing. Attempt: $((attempt + 1)) of 15..."
         sleep 600  # 10 minutes
         ((attempt++))
     done
 
     if [[ -f "$lockfile" ]]; then
-        echo "Error: comchap is still running after 10 attempts. Exiting."
+        echo "Error: comchap is still running after 15 attempts. Exiting."
         exit 1
     fi
 
+    # Prepare comchap parameters
+    comchap_params=("--comskip=$comskip" "--lockfile=$lockfile" "--comskip-ini=$comskip_ini" "--ffmpeg=$ffmpeg")
+
+    if [[ $verbose -eq 1 ]]; then
+        comchap_params+=("--verbose")
+    fi
+
     # Run comchap with specified parameters
-    "$comchap" --comskip="$comskip" --lockfile="$lockfile" --comskip-ini="$comskip_ini" --ffmpeg="$ffmpeg" "$video_file" "$output_file"
+    "${comchap}" "${comchap_params[@]}" "$video_file" "$output_file"
 
     # Check if comchap failed to generate output file
     if [[ ! -f "$output_file" ]]; then
@@ -68,6 +84,9 @@ if [[ ! -f "$video_file" ]]; then
     echo "Error: Video file '$video_file' not found."
     exit 1
 fi
+
+# Set up logging if verbose mode is enabled
+setup_logging
 
 # Process the video file
 process_video "$video_file"
