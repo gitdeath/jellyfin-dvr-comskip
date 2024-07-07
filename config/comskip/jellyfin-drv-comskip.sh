@@ -22,6 +22,12 @@ process_video() {
     # Run comchap with specified parameters
     "$comchap" "$video_file" "$output_file"
 
+    # Check if comchap failed to generate EDL file or output file
+    if [[ $? -ne 0 || ! -f "$output_file" ]]; then
+        echo "Error running comchap or output file not created."
+        exit 1
+    fi
+
     # Clean up original files and directory
     rm -f "$video_file"  # Remove original video file
     rm -f "$nfo_file"    # Remove .nfo file
