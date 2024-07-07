@@ -1,117 +1,46 @@
 #!/usr/bin/env bash
 
-#
-# This is for Jellyfin docker. 
-# The comskip.ini file used is stored in /config/comskip for easy access, editing and to survive upgrades.
-#
+# Define paths and variables
+comchap="/config/comskip/comchap"
+output_root="/media/livetv"
 
-set -o errexit
-set -o pipefail
-set -o nounset
-# set -o xtrace
-
-# User-definable parameters
-# -------------------------
-
-# Set ffmpeg path to Jellyfin ffmpeg
-__ffmpeg="$(which ffmpeg || echo '/usr/lib/jellyfin-ffmpeg/ffmpeg')"
-
-# Set to skip commercials (mark as chapters) or cut commercials
-#__command="/config/comskip/comcut"
-__command="/config/comskip/comchap"
-
-# Set video codec for ffmpeg
-#__videocodec="libvpx-vp9"
-__videocodec="libx264"
-
-# Set audio codec for ffmpeg
-#__audiocodec="libopus"
-__audiocodec="libfdk_aac"
-
-# Set bitrate for audio codec for ffmpeg
-__bitrate="128000"
-
-# Set video container
-__container="mkv"
-
-# Set CRF
-__crf="20"
-
-# Set Preset
-__preset="slow"
-
-# Define base output directory
-__base_output_dir="/media/livetv"
-
-# -------------------------
-
-# Ensure ffmpeg exists
-[ -x "$__ffmpeg" ] || { echo "ffmpeg not found"; exit 1; }
-
-# Ensure the command exists
-[ -x "$__command" ] || { echo "Command for commercial processing not found: $__command"; exit 1; }
-
-# Green Color
-GREEN='\033[0;32m'
-
-# No Color
-NC='\033[0m'
-
-# Set Path
-__path="${1:-}"
-
-PWD="$(pwd)"
-
-die () {
-    echo >&2 "$@"
-    cd "${PWD}"
-    exit 1
+# Function to extract output directory from .nfo file
+get_output_directory() {
+    local nfo_file="$1"
+    local title=$(grep "<title>" "$nfo_file" | sed -e 's/<[^>]*>//g')
+    echo "$output_root/$title"
 }
 
-# verify a path was provided
-[ -n "$__path" ] || die "path is required"
-# verify the path exists
-[ -f "$__path" ] || die "path ($__path) is not a file"
+# Function to process the video file
+process_video() {
+    local video_file="$1"
+    local original_filename=$(basename "$video_file")
+    local nfo_file="${video_file%.*}.nfo"
+    local output_directory=$(get_output_directory "$nfo_file")
+    local output_file="${output_directory}/${original_filename%.*}.mkv"
 
-__dir="$(dirname "${__path}")"
-__file="$(basename "${__path}")"
-__base="$(basename "${__path}" ".ts")"
+    # Run comchap with specified parameters
+    "$comchap" "$video_file" "$output_file"
 
-# Verify the .nfo file exists
-__nfo_file="${__dir}/${__base}.nfo"
-[ -f "$__nfo_file" ] || die "NFO file ($__nfo_file) does not exist"
+    # Clean up original files and directory
+    rm -f "$video_file"  # Remove original video file
+    rm -f "$nfo_file"    # Remove .nfo file
+    rmdir "$(dirname "$video_file")"  # Remove parent directory if empty
+}
 
-# Extract the title from the .nfo file using xmllint
-__title=$(xmllint --xpath 'string(//*[local-name()="title"])' "${__nfo_file}") || die "Failed to extract title from NFO file"
+# Main script logic
+if [[ $# -lt 1 ]]; then
+    echo "Usage: $(basename "$0") <video_file>"
+    exit 1
+fi
 
-# Define output directory
-__output_dir="${__base_output_dir}/${__title}"
+video_file="$1"
 
-# Ensure output directory exists
-mkdir -p "${__output_dir}"
+# Check if video file exists
+if [[ ! -f "$video_file" ]]; then
+    echo "Error: Video file '$video_file' not found."
+    exit 1
+fi
 
-# Debugging path variables
-# printf "${GREEN}path:${NC} ${__path}\ndir: ${__dir}\nbase: ${__base}\noutput_dir: ${__output_dir}\n"
-
-# Change to the directory containing the recording
-cd "${__dir}"
-
-# Extract closed captions to external SRT file
-#printf "[post-process.sh] %bExtracting subtitles...%b\n" "$GREEN" "$NC"
-#"$__ffmpeg" -f lavfi -i "movie=${__file}[out+subcc]" -map 0:1 "${__base}.en.srt"
-
-# comcut/comskip - currently using jellyfin ffmpeg in docker
-"$__command" --ffmpeg="$__ffmpeg" --comskip="/opt/Comskip/comskip" --lockfile="/tmp/comchap.lock" --comskip-ini="/config/comskip/comskip.ini" "${__file}"
-
-# Transcode to mkv, crf parameter can be adjusted to change output quality
-printf "[post-process.sh] %bTranscoding file...%b\n" "$GREEN" "$NC"
-"$__ffmpeg" -i "${__file}" -i "${__file}" -map 0 -map 1:s -acodec "${__audiocodec}" -b:a "${__bitrate}" -vcodec "${__videocodec}" -vf yadif=parity=auto -crf "${__crf}" -preset "${__preset}" -metadata:s:s:0 language=eng "${__output_dir}/${__base}.${__container}"
-
-# Remove the original recording file
-printf "[post-process.sh] %bRemoving original files...%b\n" "$GREEN" "$NC"
-rm "${__file}"
-rm "${__nfo_file}"
-rm -r "${__dir}"
-
-# Return to the starting directory
-cd "${PWD}"
+# Process the video file
+process_video "$video_file"
