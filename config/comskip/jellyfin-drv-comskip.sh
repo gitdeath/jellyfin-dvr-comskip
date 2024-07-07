@@ -7,7 +7,7 @@ output_root="/media/livetv"
 # Function to extract output directory from .nfo file
 get_output_directory() {
     local nfo_file="$1"
-    local title=$(grep "<title>" "$nfo_file" | sed -e 's/<[^>]*>//g')
+    local title=$(grep "<title>" "$nfo_file" | sed -e 's/<[^>]*>//g' | xargs)  # Use xargs to trim any leading/trailing whitespace
     echo "$output_root/$title"
 }
 
@@ -19,12 +19,15 @@ process_video() {
     local output_directory=$(get_output_directory "$nfo_file")
     local output_file="${output_directory}/${original_filename%.*}.mkv"
 
+    # Ensure the output directory exists
+    mkdir -p "$output_directory"
+
     # Run comchap with specified parameters
     "$comchap" --comskip="/opt/Comskip/comskip" --lockfile="/tmp/comchap.lock" --comskip-ini="/config/comskip/comskip.ini" --ffmpeg="/usr/local/bin/ffmpeg" "$video_file" "$output_file"
 
-    # Check if comchap failed to generate EDL file or output file
-    if [[ $? -ne 0 || ! -f "$output_file" ]]; then
-        echo "Error running comchap or output file not created."
+    # Check if comchap failed to generate output file
+    if [[ ! -f "$output_file" ]]; then
+        echo "Error running comchap or output file not created: $output_file"
         exit 1
     fi
 
