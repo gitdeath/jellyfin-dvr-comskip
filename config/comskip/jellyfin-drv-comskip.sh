@@ -20,7 +20,7 @@ process_video() {
     local output_file="${output_directory}/${original_filename%.*}.mkv"
 
     # Run comchap with specified parameters
-    "$comchap" "$video_file" "$output_file"
+    "$comchap" --comskip="/opt/Comskip/comskip" --lockfile="/tmp/comchap.lock" --comskip-ini="/config/comskip/comskip.ini" --ffmpeg="/usr/local/bin/ffmpeg" "$video_file" "$output_file"
 
     # Check if comchap failed to generate EDL file or output file
     if [[ $? -ne 0 || ! -f "$output_file" ]]; then
