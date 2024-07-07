@@ -21,10 +21,12 @@ __ffmpeg="$(which ffmpeg || echo '/usr/lib/jellyfin-ffmpeg/ffmpeg')"
 __command="/config/comskip/comchap"
 
 # Set video codec for ffmpeg
-__videocodec="libvpx-vp9"
+#__videocodec="libvpx-vp9"
+__videocodec="libx264"
 
 # Set audio codec for ffmpeg
-__audiocodec="libopus"
+#__audiocodec="libopus"
+__audiocodec="libfdk_aac"
 
 # Set bitrate for audio codec for ffmpeg
 __bitrate="128000"
