@@ -88,7 +88,7 @@ process_video() {
     mv "$output_directory" "$output_root"
 
     # Force Jellyfin to scan
-    curl -X POST http://localhost:8096/library/refresh?api_key=937f03ed6af24cd2b2343e42278a0002
+    curl -X POST http://localhost:8096/library/refresh
 }
 
 # Main script logic
