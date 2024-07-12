@@ -199,7 +199,7 @@ if $hascommercials ; then
     umask 002  # Set desired permissions (e.g., 755 for directories or 644 for files)
 
     tempfile=`mktemp --suffix=."$outextension" "$outdir"/XXXXXXXX`
-
+    chmod 777 "$tempfile"
     echo Writing file to temporary file: "$tempfile"
     if $ffmpegPath -loglevel error -hide_banner -nostdin -i "$infile" -i "$metafile" -map_metadata 1 -codec copy -y "$tempfile" 1>&3 2>&4; then
       mv -f "$tempfile" "$outfile"
