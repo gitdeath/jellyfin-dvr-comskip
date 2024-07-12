@@ -196,6 +196,7 @@ if $hascommercials ; then
   echo "title=Chapter $i" >> "$metafile"
 
   if [ "$infile" -ef "$outfile" ] ; then
+    umask 002  # Set desired permissions (e.g., 755 for directories or 644 for files)
 
     tempfile=`mktemp --suffix=."$outextension" "$outdir"/XXXXXXXX`
 
