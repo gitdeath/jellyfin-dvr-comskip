@@ -29,21 +29,23 @@ merge_ts_files() {
     echo "$merged_file"
 }
 
+# Function to convert .ts files to .mp4 in the original directory
+convert_to_mp4() {
+    local ts_file="$1"
+    local mp4_file="${ts_file%.*}.mp4"  # Output file in the same directory as original .ts file
+    ffmpeg -hwaccel qsv -c:v h264_qsv -i "$ts_file" -c:v h264_qsv -c:a aac -strict experimental -b:a 192k "$mp4_file"
+    echo "$mp4_file"  # Only echo the resulting filename
+}
+
 # Function to process the video file
 process_video() {
     local video_file="$1"
     local original_filename=$(basename "$video_file")
     local output_directory=$(dirname "$video_file")
-    local output_file="${output_directory}/${original_filename%.*}.mkv"
-
-    # Ensure the output directory exists
-    if ! mkdir -p "$output_directory"; then
-        echo "Failed to create output directory: $output_directory"
-        exit 1  # Exit the script with a non-zero status indicating failure
-    fi
+    local parent_directory=$(basename "$(dirname "$video_file")")
 
     # Check for lock file and retry logic
-    attempt=0
+    local attempt=0
     while [[ -f "$lockfile" && $attempt -lt 15 ]]; do
         echo "Waiting for comchap to finish processing. Attempt: $((attempt + 1)) of 15..."
         sleep 600  # 10 minutes
@@ -58,37 +60,51 @@ process_video() {
     # Merge .ts files if more than one exists
     local video_dir=$(dirname "$video_file")
     if [[ $(find "$video_dir" -maxdepth 1 -name "*.ts" | wc -l) -gt 1 ]]; then
-        video_file="$(merge_ts_files "$video_dir")"
+        video_file=$(merge_ts_files "$video_dir")
     fi
 
+    # Convert .ts to .mp4 in the original directory
+    local mp4_file
+    mp4_file=$(convert_to_mp4 "$video_file")
+
     # Prepare comchap parameters
-    comchap_params=("--comskip=$comskip" "--lockfile=$lockfile" "--comskip-ini=$comskip_ini" "--ffmpeg=$ffmpeg")
+    local comchap_params=("--comskip=$comskip" "--lockfile=$lockfile" "--comskip-ini=$comskip_ini" "--ffmpeg=$ffmpeg")
 
     if [[ $verbose -eq 1 ]]; then
         comchap_params+=("--verbose")
     fi
 
-    # Run comchap with specified parameters
-    "${comchap}" "${comchap_params[@]}" "$video_file" "$output_file"
+    # Run comchap with specified parameters on the .mp4 file
+    "${comchap}" "${comchap_params[@]}" "$mp4_file"
+    comchap_exit_code=$?
 
-    # Debugging: Check existence of output file
-    echo "Checking if output file was created: $output_file"
-    ls -l "$output_file"
-
-    # Check if comchap failed to generate output file
-    if [[ ! -f "$output_file" ]]; then
-        echo "Error running comchap or output file not created: $output_file"
+    # Check the exit code of comchap
+    if [[ $comchap_exit_code -ne 0 ]]; then
+        echo "Error: comchap did not exit cleanly with exit code $comchap_exit_code"
         exit 1
     fi
 
-    # Clean up original .ts and .nfo files
-    find "$(dirname "$video_file")" -type f \( -name "*.ts" -o -name "*.nfo" \) -delete
+    # Debugging: Check existence of the processed file (same as input .mp4)
+    echo "Checking if processed file exists: $mp4_file"
+    ls -l "$mp4_file"
 
-    # Move output directory (Time) to output_root
-    mv "$output_directory" "$output_root"
+    # Clean up original .ts and .nfo files (only if comchap exits cleanly)
+    find "$video_dir" -type f \( -name "*.ts" -o -name "*.nfo" \) -delete
+
+    # Ensure the output directory exists
+    if ! mkdir -p "$output_root/$parent_directory"; then
+        echo "Failed to create output directory: $output_root/$parent_directory"
+        exit 1  # Exit the script with a non-zero status indicating failure
+    fi
+
+    # Move the processed .mp4 file to the output directory in output_root with original filename
+    mv "$mp4_file" "$output_root/$parent_directory/${original_filename%.*}.mp4"
+
+    # Remove parent directory if it is empty
+    rmdir "$video_dir" &> /dev/null || echo "Failed to remove parent directory: $video_dir"
 
     # Force Jellyfin to scan
-    curl -X POST http://localhost:8096/library/refresh
+    curl -X POST http://localhost:8096/library/refresh?<apikey>
 }
 
 # Main script logic
