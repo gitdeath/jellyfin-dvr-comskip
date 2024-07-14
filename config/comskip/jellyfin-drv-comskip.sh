@@ -65,7 +65,7 @@ process_video() {
 
     # Convert .ts to .mp4 in the original directory
     local mp4_file
-    echo "Convert $ts_file to mp4"
+    echo "Convert $video_file to mp4"
     mp4_file=$(convert_to_mp4 "$video_file")
 
     # Prepare comchap parameters
