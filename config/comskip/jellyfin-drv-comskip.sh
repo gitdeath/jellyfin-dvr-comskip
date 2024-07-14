@@ -13,6 +13,7 @@ verbose=1
 # Function to set up logging
 setup_logging() {
     if [[ $verbose -eq 1 ]]; then
+	mkdir -p "$log_dir"
         log_file="$log_dir/$(date '+%Y_%m_%d')_post_processing.log"
         echo "" >> "$log_file"
         echo "==== Starting new run at $(date) ====" >> "$log_file"
@@ -24,7 +25,6 @@ setup_logging() {
 merge_ts_files() {
     local dir="$1"
     local merged_file="$dir/merged.ts"
-    echo "Merging .ts files in $dir to $merged_file"
     ffmpeg -i "concat:$(ls -v "$dir"/*.ts | tr '\n' '|')" -c copy "$merged_file"
     echo "$merged_file"
 }
@@ -36,7 +36,6 @@ convert_to_mp4() {
     ffmpeg -hwaccel qsv -c:v h264_qsv -i "$ts_file" -c:v h264_qsv -c:a aac -strict experimental -b:a 192k "$mp4_file"
     echo "$mp4_file"  # Only echo the resulting filename
 }
-
 # Function to process the video file
 process_video() {
     local video_file="$1"
@@ -60,21 +59,24 @@ process_video() {
     # Merge .ts files if more than one exists
     local video_dir=$(dirname "$video_file")
     if [[ $(find "$video_dir" -maxdepth 1 -name "*.ts" | wc -l) -gt 1 ]]; then
+        echo "Merging .ts files in $vidoe_dir to $merged_file"
         video_file=$(merge_ts_files "$video_dir")
     fi
 
     # Convert .ts to .mp4 in the original directory
     local mp4_file
+    echo "Convert $ts_file to mp4"
     mp4_file=$(convert_to_mp4 "$video_file")
 
     # Prepare comchap parameters
+    echo "Locate commercials"
     local comchap_params=("--comskip=$comskip" "--lockfile=$lockfile" "--comskip-ini=$comskip_ini" "--ffmpeg=$ffmpeg")
 
     if [[ $verbose -eq 1 ]]; then
         comchap_params+=("--verbose")
     fi
 
-    # Run comchap with specified parameters on the .mp4 file
+    # Run comchap with specified parameters on the .mp4 file  
     "${comchap}" "${comchap_params[@]}" "$mp4_file"
     comchap_exit_code=$?
 
@@ -98,13 +100,14 @@ process_video() {
     fi
 
     # Move the processed .mp4 file to the output directory in output_root with original filename
+    echo "Move $mp4_file to $output_root/$parent_directory/${original_filename%.*}.mp4"
     mv "$mp4_file" "$output_root/$parent_directory/${original_filename%.*}.mp4"
 
     # Remove parent directory if it is empty
     rmdir "$video_dir" &> /dev/null || echo "Failed to remove parent directory: $video_dir"
 
     # Force Jellyfin to scan
-    curl -X POST http://localhost:8096/library/refresh?<apikey>
+    curl -X POST http://localhost:8096/library/refresh?api_key<apikey>
 }
 
 # Main script logic
@@ -126,4 +129,3 @@ setup_logging
 
 # Process the video file
 process_video "$video_file"
-
